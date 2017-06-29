@@ -12,7 +12,7 @@ from neural_network import NeuralNetwork
 from dqnagent import DQNAgent
 
 FLAGS = None
-#testaaaa master another branch 1 2 3
+
 def main(_):
     # set up an environment
     env = gym.make('CartPole-v1')
