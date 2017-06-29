@@ -28,6 +28,8 @@ class QNetworks:
 
     def save_variables(self, step, model_path=None):
         if model_path:
+            if not tf.gfile.Exists(model_path):
+                tf.gfile.MakeDirs(model_path)
             self.saver.save(self.sess, model_path, global_step=step)
             print('save model to '+model_path)
 
