@@ -3,49 +3,41 @@ import argparse
 
 import numpy as np
 import tensorflow as tf
-from tensorflow.examples.tutorials.mnist import input_data
 
 # Open AI gym
 import gym
 
-from q_function import QFunction
-from q_function import MySession
+from q_networks import QNetworks
+from neural_network import NeuralNetwork
 from dqnagent import DQNAgent
 
 FLAGS = None
 
 def main(_):
-    if tf.gfile.Exists(FLAGS.log_dir):
-        tf.gfile.DeleteRecursively(FLAGS.log_dir)
-    tf.gfile.MakeDirs(FLAGS.log_dir)
-
     # set up an environment
     env = gym.make('CartPole-v1')
     # env = gym.make('Acrobot-v1')
-    #env = gym.make('MountainCar-v0')
-
-    obs_size = env.observation_space.shape[0]
-    n_actions = env.action_space.n
+    # env = gym.make('MountainCar-v0')
     obs = env.reset()
     print('Observation space: ', env.observation_space,
             'Action space: ', env.action_space,
             'Initial observation: ', obs)
 
+    n_obs = env.observation_space.shape[0]
+    n_actions = env.action_space.n
+
     history_size = 4
 
-    sess = MySession(FLAGS.log_dir + '/log')
-    q_function = QFunction("q_orig", sess(),
-                obs_size * history_size, n_actions,
-                learning_rate=0.0005)
-    q_hat_function = QFunction("q_hat", sess(),
-                obs_size * history_size, n_actions)
-    sess.initialize_variables()
+    # set up Q networks
+    q_networks = QNetworks(FLAGS.log_dir, NeuralNetwork,
+        n_obs * history_size, n_actions,
+        learning_rate=0.0005)
 
     if FLAGS.restore_model_path:
-        sess.restore_variables(FLAGS.restore_model_path)
+        q_networks.restore_variables(FLAGS.restore_model_path)
 
     # set up an agent
-    agent = DQNAgent(env, q_function, q_hat_function,
+    agent = DQNAgent(env, q_networks,
                 minibatch_size_limit=32,
                 gamma=0.99,
                 initial_exploration=0.3 ,
@@ -56,7 +48,7 @@ def main(_):
                 replay_buffuer_size=1000000)
 
     # training
-    for episode in range(1,FLAGS.max_steps+1):
+    for episode in range(1, FLAGS.max_steps+1):
         terminal = False
         agent.new_episode()
         total_reward = 0
@@ -76,10 +68,10 @@ def main(_):
                 time += 1
 
         if episode % 500 == 0:
-            sess.save_variables(episode, FLAGS.save_model_path)
+            q_networks.save_variables(episode, FLAGS.save_model_path)
 
         print('#', episode, 'R: ', total_reward)
-        sess.write_summary(episode, total_reward)
+        q_networks.write_summary(episode, total_reward)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()

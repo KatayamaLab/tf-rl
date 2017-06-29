@@ -1,14 +1,10 @@
-import sys
-import argparse
-from copy import deepcopy
-
 import numpy as np
 import random
 
 from replay_buffer import ReplayBuffer
 
 class DQNAgent:
-    def __init__(self, env, q_function, q_hat_function,
+    def __init__(self, env, q_networks,
             minibatch_size_limit=32,
             gamma=0.99,
             initial_exploration=1.0,
@@ -23,8 +19,7 @@ class DQNAgent:
         self.n_actions = env.action_space.n
         self.n_states = env.observation_space.shape[0]
 
-        self.q_function = q_function
-        self.q_hat_function = q_hat_function
+        self.q_networks = q_networks
 
         self.minibatch_size_limit = minibatch_size_limit
         self.gamma = gamma
@@ -45,7 +40,7 @@ class DQNAgent:
                             / final_exploration_update_step
 
     def act(self):
-        a_t = np.argmax(self.q_function(self.phi_t))
+        a_t = np.argmax(self.q_networks.perform_q(self.phi_t))
 
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
         phi_t_1 = np.hstack((
@@ -60,7 +55,7 @@ class DQNAgent:
         if random.random() <= self.epsilon:
             a_t = random.randint(0, self.n_actions-1)
         else:
-            a_t = np.argmax(self.q_function(self.phi_t))
+            a_t = np.argmax(self.q_networks.perform_q(self.phi_t))
         if self.epsilon > self.final_exploration:
             self.epsilon -= self.epsilon_step
 
@@ -78,24 +73,23 @@ class DQNAgent:
 
         minibatch = self.replay_buffer.sample(self.minibatch_size_limit)
         for phi_j, a_j, r_j, phi_j_1, terminal_j in minibatch:
-            y_j = self.q_function(phi_j)[0]
+            y_j = self.q_networks.perform_q(phi_j)[0]
             if terminal_j:
                 y_j[a_j] = r_j
             else:
                 # DDQN
-                a = np.argmax(self.q_function(phi_j_1))
-                y_j[a_j] = r_j + self.gamma * self.q_hat_function(phi_j_1)[0,a]
-
+                a = np.argmax(self.q_networks.perform_q(phi_j_1))
+                y_j[a_j] = r_j + self.gamma * self.q_networks.perform_q_hat(phi_j_1)[0,a]
                 # DQN
-                #y_j[a_j] = r_j + self.gamma * np.max(self.q_hat_function(phi_j_1))
+                #y_j[a_j] = r_j + self.gamma * np.max(self.q_networks.perform_q_hat(phi_j_1))
             y = np.vstack((y, y_j))
             phi = np.vstack((phi, phi_j))
 
-        self.q_function.train(np.array(phi, dtype=np.float32),
+        self.q_networks.train_q(np.array(phi, dtype=np.float32),
                                         np.array(y, dtype=np.float32))
 
         if self.step % self.target_update_step == 0:
-             self.q_hat_function.set_variables(self.q_function.read_variables())
+             self.q_networks.update_q_hat()
         self.step += 1
 
         return a_t, s_t_1, r_t, terminal
