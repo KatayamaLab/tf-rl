@@ -31,7 +31,7 @@ def main(_):
     # set up Q networks
     q_networks = QNetworks(FLAGS.log_dir, NeuralNetwork,
         n_obs * history_size, n_actions,
-        learning_rate=0.0005)
+        learning_rate=0.00025)
 
     if FLAGS.restore_model_path:
         q_networks.restore_variables(FLAGS.restore_model_path)
@@ -39,13 +39,14 @@ def main(_):
     # set up an agent
     agent = DQNAgent(env, q_networks,
                 minibatch_size_limit=32,
-                gamma=0.99,
-                initial_exploration=0.3 ,
-                final_exploration=0.01,
-                final_exploration_update_step=50000,
-                target_update_step=200,
+                discount_factor=0.99,
                 history_size=history_size,
-                replay_buffuer_size=1000000)
+                target_update_step=10000,
+                initial_exploration=1.0,
+                final_exploration=0.1,
+                final_exploration_frame=1000000,
+                replay_start_size=50000,
+                replay_memory_size=1000000)
 
     # training
     for episode in range(1, FLAGS.max_steps+1):

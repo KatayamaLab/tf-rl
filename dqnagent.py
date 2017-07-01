@@ -6,13 +6,14 @@ from replay_buffer import ReplayBuffer
 class DQNAgent:
     def __init__(self, env, q_networks,
             minibatch_size_limit=32,
-            gamma=0.99,
+            discount_factor=0.99,
+            history_size=1,
+            target_update_step=10000,
             initial_exploration=1.0,
             final_exploration=0.1,
-            final_exploration_update_step=1000000,
-            target_update_step=10000,
-            history_size=1,
-            replay_buffuer_size=1000000):
+            final_exploration_frame=1000000,
+            replay_start_size=50000,
+            replay_memory_size=1000000):
         self.env = env
         self.new_episode()
 
@@ -22,9 +23,9 @@ class DQNAgent:
         self.q_networks = q_networks
 
         self.minibatch_size_limit = minibatch_size_limit
-        self.gamma = gamma
+        self.gamma = discount_factor
 
-        self.replay_buffer = ReplayBuffer(replay_buffuer_size)
+        self.replay_buffer = ReplayBuffer(replay_memory_size)
 
         self.target_update_step = target_update_step
         self.step = 0
@@ -35,9 +36,10 @@ class DQNAgent:
                                 astype(np.float32)
 
         self.epsilon = initial_exploration
+        self.replay_start_size = replay_start_size
         self.final_exploration = final_exploration
         self.epsilon_step = (initial_exploration - final_exploration) \
-                            / final_exploration_update_step
+                            / final_exploration_frame
 
     def act(self):
         a_t = np.argmax(self.q_networks.perform_q(self.phi_t))
@@ -56,7 +58,7 @@ class DQNAgent:
             a_t = random.randint(0, self.n_actions-1)
         else:
             a_t = np.argmax(self.q_networks.perform_q(self.phi_t))
-        if self.epsilon > self.final_exploration:
+        if self.epsilon > self.final_exploration and self.replay_start_size>=self.step:
             self.epsilon -= self.epsilon_step
 
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
