@@ -68,7 +68,7 @@ def main(_):
                 total_reward += r_t
                 time += 1
 
-        if episode % 500 == 0:
+        if episode % 1000 == 0:
             q_networks.save_variables(episode, FLAGS.save_model_path)
 
         print('#', episode, 'R: ', total_reward)
@@ -79,15 +79,15 @@ if __name__ == '__main__':
     parser.add_argument('--fake_data', nargs='?', const=True, type=bool,
                       default=False,
                       help='If true, uses fake data for unit testing.')
-    parser.add_argument('--max_steps', type=int, default=5000,
+    parser.add_argument('--max_steps', type=int, default=10000,
                       help='Number of steps to run trainer.')
     parser.add_argument('--learning_rate', type=float, default=0.001,
                       help='Initial learning rate')
-    parser.add_argument('--log_dir', type=str, default='/tmp/tf-rl',
+    parser.add_argument('--log_dir', type=str, default='/tmp/tf-rl/log',
                       help='Summaries log directory')
     parser.add_argument('--restore_model_path', type=str, default='',
                       help='Model path for restore')
-    parser.add_argument('--save_model_path', type=str, default='./model/model.ckpt',
+    parser.add_argument('--save_model_path', type=str, default='/tmp/tf-rl/model/model.ckpt',
                       help='Model path for save')
     parser.add_argument('--no_train', nargs='?', const=True, type=bool,
                       default=False,
