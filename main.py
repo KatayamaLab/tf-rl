@@ -74,6 +74,7 @@ def main(_):
         print('#', episode, 'R: ', total_reward)
         q_networks.write_summary(episode, total_reward)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--fake_data', nargs='?', const=True, type=bool,
