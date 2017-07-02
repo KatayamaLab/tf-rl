@@ -1,8 +1,10 @@
+import os.path
 import numpy as np
 import tensorflow as tf
 
+
 class QNetworks:
-    def __init__(self, logdir, NNClass, n_obs, n_action, learning_rate=0.0005):
+    def __init__(self, log_dir, NNClass, n_obs, n_action, learning_rate=0.0005):
         self.sess = tf.Session()
 
         self.q = NNClass("q_orig", n_obs, n_action, learning_rate)
@@ -16,27 +18,29 @@ class QNetworks:
         self.saver = tf.train.Saver(max_to_keep=0)
         self.summary = tf.summary.merge_all()
 
-        if tf.gfile.Exists(logdir):
-            tf.gfile.DeleteRecursively(logdir)
-        tf.gfile.MakeDirs(logdir)
+        if tf.gfile.Exists(log_dir):
+            tf.gfile.DeleteRecursively(log_dir)
+        tf.gfile.MakeDirs(log_dir)
 
-        self.log_writer = tf.summary.FileWriter(logdir, self.sess.graph, flush_secs=20)
+        self.log_writer = tf.summary.FileWriter(log_dir, self.sess.graph, flush_secs=20)
 
     def write_summary(self, episode, total_reward):
         summary = self.sess.run(self.summary, feed_dict={self.total_reward: np.array(total_reward)})
         self.log_writer.add_summary(summary, episode)
 
-    def save_variables(self, step, model_path=None):
-        if model_path:
-            if not tf.gfile.Exists(model_path):
-                tf.gfile.MakeDirs(model_path)
-            self.saver.save(self.sess, model_path, global_step=step)
-            print('save model to '+model_path)
+    def save_variables(self, step, model_dir=None):
+        if model_dir:
+            if not tf.gfile.Exists(model_dir):
+                tf.gfile.MakeDirs(model_dir)
+            full_path = os.path.join(model_dir, 'model')
+            self.saver.save(self.sess, full_path, global_step=step)
+            print('save model to ' + full_path)
 
-    def restore_variables(self, model_path=None):
-        if model_path:
-            self.saver.restore(self.sess, model_path)
-            print('Restore model from '+model_path)
+    def restore_variables(self, model_dir=None):
+        if model_dir:
+            full_path = os.path.join(model_dir, 'model')
+            self.saver.restore(self.sess, full_path)
+            print('Restore model from ' + full_path)
 
     def perform_q(self, x):
         return self.q(self.sess, x)

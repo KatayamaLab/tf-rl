@@ -58,7 +58,7 @@ class DQNAgent:
             a_t = random.randint(0, self.n_actions-1)
         else:
             a_t = np.argmax(self.q_networks.perform_q(self.phi_t))
-        if self.epsilon > self.final_exploration and self.replay_start_size>=self.step:
+        if self.epsilon > self.final_exploration and self.step >= self.replay_start_size:
             self.epsilon -= self.epsilon_step
 
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
@@ -70,28 +70,30 @@ class DQNAgent:
         self.replay_buffer.append([self.phi_t, a_t, r_t, phi_t_1, terminal])
         self.phi_t = phi_t_1
 
-        y = np.zeros((0, self.n_actions))
-        phi = np.zeros((0, self.n_states * self.history))
+        if self.step >= self.replay_start_size:
 
-        minibatch = self.replay_buffer.sample(self.minibatch_size_limit)
-        for phi_j, a_j, r_j, phi_j_1, terminal_j in minibatch:
-            y_j = self.q_networks.perform_q(phi_j)[0]
-            if terminal_j:
-                y_j[a_j] = r_j
-            else:
-                # DDQN
-                a = np.argmax(self.q_networks.perform_q(phi_j_1))
-                y_j[a_j] = r_j + self.gamma * self.q_networks.perform_q_hat(phi_j_1)[0,a]
-                # DQN
-                #y_j[a_j] = r_j + self.gamma * np.max(self.q_networks.perform_q_hat(phi_j_1))
-            y = np.vstack((y, y_j))
-            phi = np.vstack((phi, phi_j))
+            y = np.zeros((0, self.n_actions))
+            phi = np.zeros((0, self.n_states * self.history))
 
-        self.q_networks.train_q(np.array(phi, dtype=np.float32),
-                                        np.array(y, dtype=np.float32))
+            minibatch = self.replay_buffer.sample(self.minibatch_size_limit)
+            for phi_j, a_j, r_j, phi_j_1, terminal_j in minibatch:
+                y_j = self.q_networks.perform_q(phi_j)[0]
+                if terminal_j:
+                    y_j[a_j] = r_j
+                else:
+                    # DDQN
+                    a = np.argmax(self.q_networks.perform_q(phi_j_1))
+                    y_j[a_j] = r_j + self.gamma * self.q_networks.perform_q_hat(phi_j_1)[0,a]
+                    # DQN
+                    #y_j[a_j] = r_j + self.gamma * np.max(self.q_networks.perform_q_hat(phi_j_1))
+                y = np.vstack((y, y_j))
+                phi = np.vstack((phi, phi_j))
 
-        if self.step % self.target_update_step == 0:
-             self.q_networks.update_q_hat()
+            self.q_networks.train_q(np.array(phi, dtype=np.float32),
+                                            np.array(y, dtype=np.float32))
+            if self.step % self.target_update_step == 0:
+                 self.q_networks.update_q_hat()
+
         self.step += 1
 
         return a_t, s_t_1, r_t, terminal

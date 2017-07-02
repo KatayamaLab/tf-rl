@@ -41,12 +41,12 @@ def main(_):
                 minibatch_size_limit=32,
                 discount_factor=0.99,
                 history_size=history_size,
-                target_update_step=10000,
+                target_update_step=100,
                 initial_exploration=1.0,
                 final_exploration=0.1,
-                final_exploration_frame=1000000,
-                replay_start_size=50000,
-                replay_memory_size=1000000)
+                final_exploration_frame=10000,
+                replay_start_size=500,
+                replay_memory_size=10000)
 
     # training
     for episode in range(1, FLAGS.max_steps+1):
@@ -69,7 +69,7 @@ def main(_):
                 time += 1
 
         if episode % 1000 == 0:
-            q_networks.save_variables(episode, FLAGS.save_model_path)
+            q_networks.save_variables(episode, FLAGS.save_model_dir)
 
         print('#', episode, 'R: ', total_reward)
         q_networks.write_summary(episode, total_reward)
@@ -77,19 +77,14 @@ def main(_):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--fake_data', nargs='?', const=True, type=bool,
-                      default=False,
-                      help='If true, uses fake data for unit testing.')
     parser.add_argument('--max_steps', type=int, default=10000,
                       help='Number of steps to run trainer.')
-    parser.add_argument('--learning_rate', type=float, default=0.001,
-                      help='Initial learning rate')
     parser.add_argument('--log_dir', type=str, default='/tmp/tf-rl/log',
                       help='Summaries log directory')
+    parser.add_argument('--save_model_dir', type=str, default='/tmp/tf-rl/model/',
+                      help='Model path for save')
     parser.add_argument('--restore_model_path', type=str, default='',
                       help='Model path for restore')
-    parser.add_argument('--save_model_path', type=str, default='/tmp/tf-rl/model/model.ckpt',
-                      help='Model path for save')
     parser.add_argument('--no_train', nargs='?', const=True, type=bool,
                       default=False,
                       help='If true, no training mode.')

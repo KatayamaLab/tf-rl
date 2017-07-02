@@ -17,10 +17,15 @@ class NeuralNetwork:
         self.x = tf.placeholder(tf.float32, [None, phi_dim])
         h1 = layer(self.x, phi_dim, 32, 'Hidden1')
         h2 = layer(h1, 32, 32, 'Hidden2')
-        self.y = layer(h2, 32, a_dim, 'Output', tf.identity)
+        h3 = layer(h1, 32, 32, 'Hidden3')
+        self.y = layer(h3, 32, a_dim, 'Output', tf.identity)
         self.t = tf.placeholder(tf.float32, [None, a_dim])
         loss = tf.reduce_mean(tf.square(self.t - self.y))
-        self.train_step = tf.train.RMSPropOptimizer(learning_rate).minimize(loss)
+        self.train_step = tf.train.RMSPropOptimizer(
+            learning_rate,
+            decay=0.95,
+            momentum=0.95,
+            epsilon=0.01 ).minimize(loss)
 
     def __call__(self, sess, x):
         return sess.run(self.y, feed_dict={self.x: x})
