@@ -3,8 +3,6 @@ import argparse
 
 import numpy as np
 import tensorflow as tf
-
-# Open AI gym
 import gym
 
 from q_networks import QNetworks
@@ -49,7 +47,7 @@ def main(_):
                 replay_memory_size=10000)
 
     # training
-    for episode in range(1, FLAGS.max_steps+1):
+    for episode in range(1, FLAGS.max_episodes+1):
         terminal = False
         agent.new_episode()
         total_reward = 0
@@ -68,8 +66,8 @@ def main(_):
                 total_reward += r_t
                 time += 1
 
-        if episode % 1000 == 0:
-            q_networks.save_variables(episode, FLAGS.save_model_dir)
+            if episode % 100 == 0:
+                q_networks.save_variables(episode, FLAGS.save_model_dir)
 
         print('#', episode, 'R: ', total_reward)
         q_networks.write_summary(episode, total_reward)
@@ -77,7 +75,7 @@ def main(_):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--max_steps', type=int, default=10000,
+    parser.add_argument('--max_episodes', type=int, default=10000,
                       help='Number of steps to run trainer.')
     parser.add_argument('--log_dir', type=str, default='/tmp/tf-rl/log',
                       help='Summaries log directory')

@@ -36,11 +36,10 @@ class QNetworks:
             self.saver.save(self.sess, full_path, global_step=step)
             print('save model to ' + full_path)
 
-    def restore_variables(self, model_dir=None):
-        if model_dir:
-            full_path = os.path.join(model_dir, 'model')
-            self.saver.restore(self.sess, full_path)
-            print('Restore model from ' + full_path)
+    def restore_variables(self, model_path=None):
+        if model_path:
+            self.saver.restore(self.sess, model_path)
+            print('Restore model from ' + model_path)
 
     def perform_q(self, x):
         return self.q(self.sess, x)
