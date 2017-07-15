@@ -10,22 +10,22 @@ class DQNAgent:
             self, env,
             QNetworkClass,
             minibatch_size_limit=32,
-            discount_factor=0.99,
-            history_size=1,
-            learning_rate=0.0005,
+            replay_memory_size=1000000,
+            history_length=4,
             target_update_step=10000,
+            discount_factor=0.99,
+            learning_rate=0.00025,
             initial_exploration=1.0,
             final_exploration=0.1,
             final_exploration_frame=1000000,
             replay_start_size=50000,
-            replay_memory_size=1000000,
             log_dir=None):
         self.env = env
         self.new_episode()
 
         self.n_actions = env.action_space.n
         self.n_states = env.observation_space.shape[0]
-        self.n_input = self.n_states * history_size
+        self.n_input = self.n_states * history_length
 
         #setup tensorflow
         self.sess = tf.Session()
@@ -79,28 +79,31 @@ class DQNAgent:
         return a_t, s_t_1, r_t, terminal
 
     def act_and_train(self):
+        # With probability epsilon select a random action
+        # Otherwise select acionn from Q network
         if random.random() <= self.epsilon:
             a_t = random.randint(0, self.n_actions-1)
         else:
             a_t = np.argmax(self._perform_q(self.phi_t))
-        if self.epsilon > self.final_exploration and self.step >= self.replay_start_size:
-            self.epsilon -= self.epsilon_step
 
+        # Execute action in emulator and observe reward and state
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
         phi_t_1 = np.hstack((
             self.phi_t[:, self.n_states:],
             s_t_1.astype(np.float32).reshape((1,-1))
         ))
 
+        # Store transition
         self.replay_buffer.append([self.phi_t, a_t, r_t, phi_t_1, terminal])
         self.phi_t = phi_t_1
 
+        # After specified steps start experienced replay to update Q network
         if self.step >= self.replay_start_size:
-
+            # sample minibatch
             y = np.zeros((0, self.n_actions))
             phi = np.zeros((0, self.n_input))
-
             minibatch = self.replay_buffer.sample(self.minibatch_size_limit)
+
             for phi_j, a_j, r_j, phi_j_1, terminal_j in minibatch:
                 y_j = self._perform_q(phi_j)[0]
                 if terminal_j:
@@ -114,10 +117,16 @@ class DQNAgent:
                 y = np.vstack((y, y_j))
                 phi = np.vstack((phi, phi_j))
 
-            self._train_q(np.array(phi, dtype=np.float32),
-                                            np.array(y, dtype=np.float32))
+            # Update Q network
+            self._train_q(np.array(phi, dtype=np.float32), np.array(y, dtype=np.float32))
+
+            # Update target Q network every specific steps
             if self.step % self.target_update_step == 0:
                  self._update_q_hat()
+
+            # Update Exploration ratio
+            if self.epsilon > self.final_exploration:
+                self.epsilon -= self.epsilon_step
 
         self.step += 1
 
@@ -125,9 +134,6 @@ class DQNAgent:
 
     def new_episode(self):
         self.env.reset()
-        #castomized ---env
-        self.highest=-999
-
 
     def write_summary(self, episode, total_reward):
         summary = self.sess.run(self.summary, feed_dict={self.total_reward: np.array(total_reward)})

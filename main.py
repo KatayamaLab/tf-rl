@@ -8,9 +8,16 @@ import gym
 from q_network import QNetwork
 from dqnagent import DQNAgent
 
-FLAGS = None
+tf.app.flags.DEFINE_integer('max_episodes', 10000, 'Number of episodes (10000).')
+tf.app.flags.DEFINE_string('log_dir', '/tmp/tf-rl/log', 'Summaries log directory (/tmp/tf-rl/log)')
+tf.app.flags.DEFINE_string('save_model_dir', '/tmp/tf-rl/model/', 'Model path for save (/tmp/tf-rl/model/)')
+tf.app.flags.DEFINE_integer('interval_to_save_model', 500, 'Interval to save model (500).')
+tf.app.flags.DEFINE_string('restore_model_path', '', 'Model path for restore')
+tf.app.flags.DEFINE_boolean('train', True, 'Training mode (default: true).')
 
 def main(_):
+    flags = tf.app.flags.FLAGS
+
     # set up an environment
     env = gym.make('CartPole-v1')
     # env = gym.make('Acrobot-v1')
@@ -25,58 +32,43 @@ def main(_):
                 QNetwork,
                 minibatch_size_limit=32,
                 discount_factor=0.99,
-                history_size=4,
-                learning_rate=0.0005,
+                history_length=4,
+                learning_rate=0.00025,
                 target_update_step=100,
                 initial_exploration=1.0,
                 final_exploration=0.1,
-                final_exploration_frame=10000,
-                replay_start_size=500,
-                replay_memory_size=10000,
-                log_dir=FLAGS.log_dir)
+                final_exploration_frame=100000,
+                replay_start_size=5000,
+                replay_memory_size=100000,
+                log_dir=flags.log_dir)
 
-    if FLAGS.restore_model_path:
-        agent.restore_variables(FLAGS.restore_model_path)
+    if flags.restore_model_path:
+        agent.restore_variables(flags.restore_model_path)
+
+    total_frames = 0
 
     # training
-    for episode in range(1, FLAGS.max_episodes+1):
+    for episode in range(1, flags.max_episodes+1):
         terminal = False
         agent.new_episode()
         total_reward = 0
-        time = 0
+        frames = 0
 
-        if FLAGS.no_train:
-            while not terminal:
-                a, s, r_t, terminal = agent.act()
-                env.render()
-                total_reward += r_t
-                time += 1
-        else:
-            while not terminal:
+        while not terminal:
+            if flags.train:
                 a, s, r_t, terminal = agent.act_and_train()
-                env.render()
-                total_reward += r_t
-                time += 1
+            else:
+                a, s, r_t, terminal = agent.act()
+            env.render()
+            total_reward += r_t
+            frames += 1
+            total_frames += 1
 
-            if episode % 100 == 0:
-                agent.save_variables(episode, FLAGS.save_model_dir)
+        if episode % flags.interval_to_save_model == 0:
+            agent.save_variables(episode, flags.save_model_dir)
 
-        print('#', episode, 'R: ', total_reward)
+        print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward)
         agent.write_summary(episode, total_reward)
 
-
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--max_episodes', type=int, default=10000,
-                      help='Number of steps to run trainer.')
-    parser.add_argument('--log_dir', type=str, default='/tmp/tf-rl/log',
-                      help='Summaries log directory')
-    parser.add_argument('--save_model_dir', type=str, default='/tmp/tf-rl/model/',
-                      help='Model path for save')
-    parser.add_argument('--restore_model_path', type=str, default='',
-                      help='Model path for restore')
-    parser.add_argument('--no_train', nargs='?', const=True, type=bool,
-                      default=False,
-                      help='If true, no training mode.')
-    FLAGS, unparsed = parser.parse_known_args()
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+    tf.app.run(main=main)
