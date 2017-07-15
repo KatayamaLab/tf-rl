@@ -5,8 +5,7 @@ import numpy as np
 import tensorflow as tf
 import gym
 
-from q_networks import QNetworks
-from neural_network import NeuralNetwork
+from q_network import QNetwork
 from dqnagent import DQNAgent
 
 FLAGS = None
@@ -21,30 +20,23 @@ def main(_):
             'Action space: ', env.action_space,
             'Initial observation: ', obs)
 
-    n_obs = env.observation_space.shape[0]
-    n_actions = env.action_space.n
-
-    history_size = 4
-
-    # set up Q networks
-    q_networks = QNetworks(FLAGS.log_dir, NeuralNetwork,
-        n_obs * history_size, n_actions,
-        learning_rate=0.00025)
-
-    if FLAGS.restore_model_path:
-        q_networks.restore_variables(FLAGS.restore_model_path)
-
     # set up an agent
-    agent = DQNAgent(env, q_networks,
+    agent = DQNAgent(env,
+                QNetwork,
                 minibatch_size_limit=32,
                 discount_factor=0.99,
-                history_size=history_size,
+                history_size=4,
+                learning_rate=0.0005,
                 target_update_step=100,
                 initial_exploration=1.0,
                 final_exploration=0.1,
                 final_exploration_frame=10000,
                 replay_start_size=500,
-                replay_memory_size=10000)
+                replay_memory_size=10000,
+                log_dir=FLAGS.log_dir)
+
+    if FLAGS.restore_model_path:
+        agent.restore_variables(FLAGS.restore_model_path)
 
     # training
     for episode in range(1, FLAGS.max_episodes+1):
@@ -67,10 +59,10 @@ def main(_):
                 time += 1
 
             if episode % 100 == 0:
-                q_networks.save_variables(episode, FLAGS.save_model_dir)
+                agent.save_variables(episode, FLAGS.save_model_dir)
 
         print('#', episode, 'R: ', total_reward)
-        q_networks.write_summary(episode, total_reward)
+        agent.write_summary(episode, total_reward)
 
 
 if __name__ == '__main__':
