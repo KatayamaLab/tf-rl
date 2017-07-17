@@ -130,7 +130,7 @@ class DQNAgent:
 
         self.step += 1
 
-        return a_t, s_t_1, r_t, terminal
+        return a_t, s_t_1, r_t, terminal, {'epsilon':self.epsilon}
 
     def new_episode(self):
         self.env.reset()
