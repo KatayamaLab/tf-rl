@@ -76,7 +76,7 @@ class DQNAgent:
         ))
         self.phi_t = phi_t_1
 
-        return a_t, s_t_1, r_t, terminal
+        return a_t, s_t_1, r_t, terminal, {'epsilon':self.epsilon}
 
     def act_and_train(self):
         # With probability epsilon select a random action

@@ -14,7 +14,9 @@ tf.app.flags.DEFINE_string('save_model_dir', '/tmp/tf-rl/model/', 'Model path fo
 tf.app.flags.DEFINE_integer('interval_to_save_model', 500, 'Interval to save model (500).')
 tf.app.flags.DEFINE_string('restore_model_path', '', 'Model path for restore')
 tf.app.flags.DEFINE_boolean('train', True, 'Training mode (default: true).')
-tf.app.flags.DEFINE_boolean('render', True, 'Training mode (default: true).')
+tf.app.flags.DEFINE_boolean('render', True, 'Render mode (default: true).')
+tf.app.flags.DEFINE_string('record_path', None, 'Recode path (default: none)')
+
 
 def main(_):
     flags = tf.app.flags.FLAGS
@@ -24,7 +26,11 @@ def main(_):
     #env = gym.make('CartPole-v1')
     # env = gym.make('Acrobot-v1')
     # env = gym.make('MountainCar-v0')
+    if flags.record_path:
+        env = gym.wrappers.Monitor(env, flags.record_path)
+
     obs = env.reset()
+
     print('Observation space: ', env.observation_space,
             'Action space: ', env.action_space,
             'Initial observation: ', obs)
