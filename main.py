@@ -18,21 +18,15 @@ def main(_):
     #env = gym.make('CartPole-v1')
     # env = gym.make('Acrobot-v1')
     # env = gym.make('MountainCar-v0')
-    if P.record_path:
-        env = gym.wrappers.Monitor(env, P.record_path)
-
-    obs = env.reset()
-
-    print('Observation space: ', env.observation_space,
-            'Action space: ', env.action_space,
-            'Initial observation: ', obs)
+    if P.record:
+        env = gym.wrappers.Monitor(env, P.record_path, force=True)
 
     # set up an agent
     agent = DQNAgent(env,
                 QNetwork,
                 minibatch_size_limit=32,
                 replay_memory_size=1000000,
-                history_length=4,
+                history_length=1,
                 target_update_step=200,
                 discount_factor=0.99,
                 learning_rate=0.0025,
@@ -42,6 +36,9 @@ def main(_):
                 replay_start_size=100,
                 log_dir=P.log_dir)
 
+    print('Observation space: ', env.observation_space,
+            'Action space: ', env.action_space)
+
     if P.restore_model_path:
         agent.restore_variables(P.restore_model_path)
 
@@ -50,7 +47,6 @@ def main(_):
     # training
     for episode in range(1, P.max_episodes+1):
         terminal = False
-        agent.new_episode()
         total_reward = 0
         frames = 0
 
@@ -70,6 +66,8 @@ def main(_):
 
         print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward, ' Epsilon: ', info['epsilon'])
         agent.write_summary(episode, total_reward)
+
+        agent.new_episode()
 
 if __name__ == '__main__':
     tf.app.run(main=main)

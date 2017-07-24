@@ -19,5 +19,8 @@ train = True
 # Render mode
 render = True
 
+# Record mode
+record = True
+
 # Record path
-record_path = None
+record_path = 'record/'
