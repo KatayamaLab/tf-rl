@@ -47,7 +47,8 @@ class DQNAgent:
 
         if log_dir:
             self.log_writer = tf.summary.FileWriter(log_dir, self.sess.graph, flush_secs=20)
-
+        else:
+            self.log_writer = None
         #store parameter
         self.minibatch_size_limit = minibatch_size_limit
         self.gamma = discount_factor
@@ -117,7 +118,7 @@ class DQNAgent:
                 y = np.vstack((y, y_j))
                 phi = np.vstack((phi, phi_j))
 
-            # Update Q network
+            # Update Q network #TODO comversion to numpy array should be done in q network class
             self._train_q(np.array(phi, dtype=np.float32), np.array(y, dtype=np.float32))
 
             # Update target Q network every specific steps
@@ -165,4 +166,5 @@ class DQNAgent:
         self.q_hat.set_variables(self.sess, self.q.read_variables(self.sess))
 
     def __del__(self):
-        self.log_writer.close()
+        if self.log_writer:
+            self.log_writer.close()

@@ -7,22 +7,30 @@ import gym
 
 from q_network import QNetwork
 from dqnagent import DQNAgent
-import parameters as P
+
+from pi_v_network import PiVNetwork
+from a3cagent import A3CAgent
+
+import config
 
 
 def main(_):
     flags = tf.app.flags.FLAGS
 
     # set up an environment
-    env = gym.make('LunarLander-v2')
-    #env = gym.make('CartPole-v1')
-    # env = gym.make('Acrobot-v1')
-    # env = gym.make('MountainCar-v0')
-    if P.record:
-        env = gym.wrappers.Monitor(env, P.record_path, force=True)
+    env = gym.make(config.environment)
+
+    if config.record:
+        env = gym.wrappers.Monitor(env, config.record_path, force=True)
 
     # set up an agent
-    agent = DQNAgent(env,
+    if config.continuous_action:
+        agent = A3CAgent(env,
+                PiVNetwork,
+                history_length=1,
+                log_dir=config.log_dir)
+    else:
+        agent = DQNAgent(env,
                 QNetwork,
                 minibatch_size_limit=32,
                 replay_memory_size=1000000,
@@ -34,37 +42,38 @@ def main(_):
                 final_exploration=0.01,
                 final_exploration_frame=10000,
                 replay_start_size=100,
-                log_dir=P.log_dir)
+                log_dir=config.log_dir)
 
     print('Observation space: ', env.observation_space,
             'Action space: ', env.action_space)
 
-    if P.restore_model_path:
-        agent.restore_variables(P.restore_model_path)
+    if config.restore_model_path:
+        agent.restore_variables(config.restore_model_path)
 
     total_frames = 0
 
     # training
-    for episode in range(1, P.max_episodes+1):
+    for episode in range(1, config.max_episodes+1):
         terminal = False
         total_reward = 0
         frames = 0
 
         while not terminal:
-            if P.train:
+            if config.train:
                 a, s, r_t, terminal, info = agent.act_and_train()
             else:
                 a, s, r_t, terminal, info = agent.act()
-            if P.render:
+            if config.render:
                 env.render()
             total_reward += r_t
             frames += 1
             total_frames += 1
 
-        if episode % P.interval_to_save_model == 0:
-            agent.save_variables(episode, P.save_model_dir)
+        if episode % config.interval_to_save_model == 0:
+            agent.save_variables(episode, config.save_model_dir)
 
-        print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward, ' Epsilon: ', info['epsilon'])
+        #print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward, ' Epsilon: ', info['epsilon'])
+        print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward)
         agent.write_summary(episode, total_reward)
 
         agent.new_episode()

@@ -15,9 +15,9 @@ class QNetwork:
 
         self.variable_list = []
         self.x = tf.placeholder(tf.float32, [None, phi_dim])
-        h1 = layer(self.x, phi_dim, 128, 'Hidden1')
-        h2 = layer(h1, 128, 64, 'Hidden2')
-        self.y = layer(h2, 64, a_dim, 'Output', tf.identity)
+        h1 = layer(self.x, phi_dim, 128, 'Hidden1', act=tf.nn.relu)
+        h2 = layer(h1, 128, 64, 'Hidden2', act=tf.nn.relu)
+        self.y = layer(h2, 64, a_dim, 'Output', act=tf.identity)
         self.t = tf.placeholder(tf.float32, [None, a_dim])
         loss = tf.reduce_mean(tf.square(self.t - self.y))
         self.train_step = tf.train.AdamOptimizer(learning_rate).minimize(loss)
