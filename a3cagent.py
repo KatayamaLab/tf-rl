@@ -13,17 +13,18 @@ class A3CAgent:
             log_dir=None):
         self.env = env
         self.new_episode()
-
         self.n_actions = env.action_space.shape[0] # TODO assume 1D acction now
         self.n_states = env.observation_space.shape[0] # TODO assume 1D state now
         self.n_input = self.n_states * history_length
 
         self.a_min, self.a_max = env.action_space.low, env.action_space.high
 
+        self.log_writer = None
+
         #setup tensorflow
         self.sess = tf.Session()
 
-        self.pi_v_network = PiVNetworkClass("q_orig", self.n_input, self.n_actions, learning_rate)
+        self.pi_v_network = PiVNetworkClass(self.n_input, self.n_actions, learning_rate)
 
         self.total_reward = tf.placeholder(tf.float32)
         tf.summary.scalar("TotalReward", self.total_reward)
@@ -39,23 +40,20 @@ class A3CAgent:
 
         if log_dir:
             self.log_writer = tf.summary.FileWriter(log_dir, self.sess.graph, flush_secs=20)
-        else:
-            self.log_writer = None
+
 
         #  parameters
         self.gamma = discount_factor
 
         self.step = 0
 
+        self.phi_t = np.zeros((1, self.n_input), dtype=np.float32)
         self.phi = []
         self.a = []
         self.r = []
 
-        self.phi_t = np.zeros((1, self.n_input), dtype=np.float32)
-
         #TODO inpremented as parameter
         self.t_max = 5
-
         self.t = 0
         self.T = 0
         self.t_start=0
@@ -75,16 +73,16 @@ class A3CAgent:
     def act_and_train(self):
         # Perform action according to policy
         mu, sigma = self.pi_v_network.predict_pi(self.sess, self.phi_t)
-        #print(mu,sigma)
+        print(self.phi_t,mu,sigma)
 
-        self.phi.append(self.phi_t)
-
-        a_t=np.random.normal(mu, np.sqrt(sigma))
-
-        self.a.append(a_t)
+        a_t=np.random.normal(mu*2, np.sqrt(sigma)*2)
 
         # Execute action in emulator and observe reward and state
         s_t_1, r_t, terminal, _ = self.env.step(np.clip(a_t, self.a_min, self.a_max))
+
+        self.phi.append(self.phi_t)
+        self.a.append(a_t)
+        self.r.append(r_t)
 
         phi_t_1 = np.hstack((
             self.phi_t[:, self.n_states:],
@@ -92,13 +90,10 @@ class A3CAgent:
         ))
         self.phi_t = phi_t_1
 
-        self.r.append(r_t)
-
         self.t += 1
         self.T += 1
 
         if terminal or self.t-self.t_start >= self.t_max:
-            # print(mu, sigma,phi_t_1)
             if terminal: # for terminal
                 R_t = 0.0
             else: # for non-terminal s_t// Bootstrap from last state
@@ -110,17 +105,12 @@ class A3CAgent:
                 R[i] = R_t
             self.pi_v_network.update(self.sess, self.phi, self.a, R)
 
-                #Accumulate gradient wrt theta'
-                #Accumulate gradient wrt theta
-
             # TODO Perform asynchronous updates
 
-            # TODO reset
             self.phi = []
             self.a = []
             self.r = []
             self.t_start = self.t
-            # reset gradient
 
         return a_t, s_t_1, r_t, terminal, {}
 
