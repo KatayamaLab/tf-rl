@@ -19,65 +19,69 @@ class PiVNetwork:
 
         self.variable_list = []
 
-        self.x = tf.placeholder(tf.float32, [None,phi_dim])
-        self.R = tf.placeholder(tf.float32, [None,1])
-        self.a = tf.placeholder(tf.float32, [None,a_dim])
+        self.x = tf.placeholder(tf.float32, [None, phi_dim])
+        self.a = tf.placeholder(tf.float32, [None, a_dim])
+        self.R = tf.placeholder(tf.float32, [None, 1])
 
         self.phi_dim = phi_dim
         self.a_dim = a_dim
 
-        h1 = layer(self.x, phi_dim, 200, 'Hidden1', act=tf.nn.relu)
-        h2 = layer(h1, 200, 200, 'Hidden2', act=tf.nn.relu)
+        h1 = layer(self.x, phi_dim, 100, 'Hidden1', act=tf.nn.relu)
+        h2 = layer(self.x, phi_dim, 100, 'Hidden1', act=tf.nn.relu)
+        #h2 = layer(h1, 200, 200, 'Hidden2', act=tf.nn.relu)
 
-        self.mu = layer(h2, 200, a_dim, 'mu', act=tf.identity)
-        self.sigma = layer(h2, 200, a_dim, 'sigma', act=tf.nn.softplus)
-        self.V = layer(h2, 200, 1, 'v', act=tf.identity)
+        self.mu = layer(h1, 100, a_dim, 'mu', act=tf.identity)
+        self.sigma = layer(h2, 100, a_dim, 'sigma', act=tf.nn.softplus)
+        self.V = layer(h2, 100, 1, 'v', act=tf.identity)
 
-        #log and exp is canceled
-        # self.loss_pi = (-tf.square(self.a - self.mu) / (self.sigma) - tf.sqrt( 2.0 * 3.14159265 * self.sigma)) \
-        #     * tf.stop_gradient(self.R - self.V)
-
-        self.network_params = tf.trainable_variables()
-
-        # self.loss_pi = -tf.reduce_sum(tf.log(
-        #         1/ tf.sqrt( 2.0 * 3.1415926535 * self.sigma ) *
-        #         tf.exp(-tf.square(self.a - self.mu) / (2 * self.sigma) )
-        #     ) * (self.R - tf.stop_gradient(self.V)), axis=1)
-        #self.loss_V= 0.5 * tf.reduce_sum(tf.square(self.R - self.V), axis=1)
 
         self.loss_pi = tf.log(
                 1/ tf.sqrt( 2.0 * 3.1415926535 * self.sigma ) *
                 tf.exp(-tf.square(self.a - self.mu) / (2 * self.sigma) )
-            )* tf.stop_gradient(self.R - self.V)
+            ) * tf.stop_gradient(self.R - self.V)
         self.entropy = - (tf.log(2.0 * 3.1415926535 * self.sigma) + 1.0)
 
-        self.loss_V= 0.5 * tf.square(self.R - self.V)
+        self.loss_V= tf.square(self.R - self.V)
 
-        self.grad_pi = tf.gradients(-self.loss_pi - 0.001 * self.entropy, self.network_params)
-        self.grad_V = tf.gradients(0.5 * tf.square(self.R - self.V), self.network_params)
-
-
-        # TODO output gradients to copy to local gradients
-        #self.global_pi_grad = tf.placeholder(tf.float32, [None, phi_dim])
-        #self.global_v_grad = tf.placeholder(tf.float32, [None, phi_dim])
 
         # TODO need to change to RMSProp
         # self.optimizer = tf.train.AdamOptimizer(0.000001)
         self.optimizer = tf.train.RMSPropOptimizer(
-                        learning_rate=0.000001,
+                        learning_rate=0.00001,
                         decay=0.99,
                         momentum=0.0,
                         epsilon=0.1)
 
-        #self.train_pi = self.optimizer.minimize(self.loss_pi)
-        #self.train_V = self.optimizer.minimize(self.loss_V)
-        #self.train = self.optimizer.minimize(self.loss_V+self.loss_pi)
-        self.train_pi = self.optimizer.apply_gradients(zip(self.grad_pi, self.network_params))
-        self.train_V = self.optimizer.apply_gradients(zip(self.grad_V, self.network_params))
+        #self.network_params = tf.trainable_variables()
+
+        self.grad_vals_pi = self.optimizer.compute_gradients(
+            tf.reduce_sum( -self.loss_pi + 0.001 * self.entropy)
+        )
+        self.grads_pi=[]
+        self.vals_pi=[]
+        for grad,val in self.grad_vals_pi:
+            if grad is not None:
+                self.grads_pi.append(grad)
+                self.vals_pi.append(val)
+
+        self.grad_vals_V = self.optimizer.compute_gradients(
+            tf.reduce_sum(0.5 * self.loss_V)
+        )
+        self.grads_V=[]
+        self.vals_V=[]
+        for grad,val in self.grad_vals_V:
+            if grad is not None:
+                self.grads_V.append(grad)
+                self.vals_V.append(val)
+
+        self.grad_vals_pi_ = [(vals, grads) for vals, grads in zip(self.grads_pi, self.vals_pi)]
+        self.grad_vals_V_ = [(vals, grads) for vals, grads in zip(self.grads_V, self.vals_V)]
+
+        self.train_pi = self.optimizer.apply_gradients(self.grad_vals_pi_)
+        self.train_V = self.optimizer.apply_gradients(self.grad_vals_V_)
 
         # TODO Make it ASyn
-        #self.local_pi_grad = self.optimizer.compute_gradients(self.pi_loss)
-        #self.local_v_grad = self.optimizer.compute_gradients(self.v_loss)
+
 
         #self.train_step = self.optimizer.apply_gradients(???e). \
         #    apply_gradients(grads_and_vars=(,))
@@ -96,25 +100,32 @@ class PiVNetwork:
     # def apply_gradient(self, pi_gradient, v_gradient):
 
     def update(self, sess, phi, a, R):
-        # sess.run(self.train,
         sess.run([self.train_pi,self.train_V],
             feed_dict={
-                self.x: np.array(phi, dtype=np.float32).reshape(-1, self.phi_dim),
-                self.a: np.array(a, dtype=np.float32).reshape(-1, self.a_dim),
-                self.R: np.array(R, dtype=np.float32).reshape(-1,1)
+                self.x: phi,
+                self.a: a,
+                self.R: R
+            })
+
+    def gradients(self, sess, phi, a, R):
+        return sess.run([self.grads_pi, self.grads_V],
+            feed_dict={
+                self.x: phi,
+                self.a: a,
+                self.R: R
             })
 
     def predict_pi_and_V(self, sess, x):
         mu, sigma, V = sess.run([self.mu, self.sigma, self.V], feed_dict={self.x: x})
-        return mu[0], sigma[0], V[0,0]
+        return mu[0], sigma[0], V
 
-    def predict_pi(self, sess, x):
-        mu, sigma = sess.run([self.mu, self.sigma], feed_dict={self.x: x})
+    def predict_pi(self, sess, phi):
+        mu, sigma = sess.run([self.mu, self.sigma], feed_dict={self.x: [phi]})
         return mu[0], sigma[0]
 
-    def predict_V(self, sess, x):
-        V = sess.run(self.V, feed_dict={self.x: x})
-        return V[0,0]
+    def predict_V(self, sess, phi):
+        V = sess.run(self.V, feed_dict={self.x: [phi]})
+        return V
 
     def train(self, sess, pi_grad, v_grad):
         sess.run(self.train_step,

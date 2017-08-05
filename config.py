@@ -1,5 +1,5 @@
 # Environment to play
-#environment = 'LunarLanderContinuous-v2'
+# environment = 'LunarLanderContinuous-v2'
 environment = 'Pendulum-v0'
 #environment = 'CartPole-v1'
 # environment = 'Acrobot-v1'
