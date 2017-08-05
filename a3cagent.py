@@ -3,6 +3,8 @@ import os.path
 import numpy as np
 import tensorflow as tf
 
+from copy import deepcopy
+
 class A3CAgent:
     def __init__(
             self, env,
@@ -11,7 +13,13 @@ class A3CAgent:
             discount_factor=0.99,
             learning_rate=0.00025,
             log_dir=None):
-        self.env = env
+        #self.env = env
+        self.envs = []
+        self.envs.append(env)
+        for i in range(29):
+            self.envs.append(deepcopy(self.envs[0]))
+            self.envs[i].seed(i)
+
         self.new_episode()
         self.n_actions = env.action_space.shape[0] # TODO assume 1D acction now
         self.n_states = env.observation_space.shape[0] # TODO assume 1D state now
@@ -46,16 +54,17 @@ class A3CAgent:
 
         self.step = 0
 
-        self.phi_t = np.zeros((self.n_input), dtype=np.float32)
-        self.phi = []
-        self.a = []
-        self.r = []
+        self.phi_t = [np.zeros((self.n_input), dtype=np.float32) for i in range(len(self.envs))]
+        self.phi = [[] for i in range(len(self.envs))]
+        self.a = [[] for i in range(len(self.envs))]
+        self.r = [[] for i in range(len(self.envs))]
+        self.R = [[] for i in range(len(self.envs))]
 
         #TODO inpremented as parameter
         self.t_max = 5
-        self.t = 0
+        self.t = [0 for i in range(len(self.envs))]
+        self.t_start=[0 for i in range(len(self.envs))]
         self.T = 0
-        self.t_start=0
 
     def act(self):
         a_t = np.argmax(self._perform_q(self.phi_t))
@@ -70,52 +79,57 @@ class A3CAgent:
         return a_t, s_t_1, r_t, terminal, {}
 
     def act_and_train(self):
-        # Perform action according to policy
-        mu, sigma = self.pi_v_network.predict_pi(self.sess, self.phi_t)
+        for (j,env) in enumerate(self.envs):
+            # Perform action according to policy
+            mu, sigma = self.pi_v_network.predict_pi(self.sess, self.phi_t[j])
 
-        a_t=np.clip(np.random.normal(mu, np.sqrt(sigma)), self.a_min, self.a_max)
+            a_t=np.clip(np.random.normal(mu, np.sqrt(sigma)), self.a_min, self.a_max)
 
-        # Execute action in emulator and observe reward and state
-        s_t_1, r_t, terminal, _ = self.env.step(a_t)
-        self.phi.append(self.phi_t)
-        self.a.append(a_t)
-        self.r.append(r_t)
+            # Execute action in emulator and observe reward and state
+            s_t_1, r_t, terminal, _ = self.envs[j].step(a_t)
+            #self.envs[j].render()
+            self.phi[j].append(self.phi_t[j])
+            self.a[j].append(a_t)
+            self.r[j].append(r_t)
 
-        phi_t_1 = np.hstack((
-            self.phi_t[self.n_states:],
-            s_t_1.astype(np.float32)
-        )).reshape((-1))
+            self.phi_t[j] = np.hstack((
+                self.phi_t[j][self.n_states:],
+                s_t_1.astype(np.float32)
+            )).reshape((-1))
 
-        self.phi_t = phi_t_1
+            self.t[j] += 1
+            self.T += 1
 
-        self.t += 1
-        self.T += 1
+            if terminal or self.t[j]-self.t_start[j] >= self.t_max:
+                if terminal: # for terminal
+                    R_t = 0.0
+                else: # for non-terminal s_t// Bootstrap from last state
+                    R_t = self.pi_v_network.predict_V(self.sess, self.phi_t[j])
 
-        if terminal or self.t-self.t_start >= self.t_max:
-            if terminal: # for terminal
-                R_t = 0.0
-            else: # for non-terminal s_t// Bootstrap from last state
-                R_t = self.pi_v_network.predict_V(self.sess, self.phi_t)
+                for i in reversed(range(0, self.t[j]-self.t_start[j])): # i: t-1...t_start
+                    R_t = self.r[j][i] + self.gamma * R_t
+                    self.R[j].append([R_t])
+                #print(self.phi[i], mu, sigma)
 
-            R = np.zeros((self.t-self.t_start,1));
-            for i in reversed(range(0, self.t-self.t_start)): # i: t-1...t_start
-                R_t = self.r[i] + self.gamma * R_t
-                R[i] = [R_t]
-            print(self.phi[i], mu, sigma)
+                if j==len(self.envs)-1:
 
-            self.pi_v_network.update(self.sess, self.phi, self.a, R)
-
-            # TODO Perform asynchronous updates
-
-            self.phi = []
-            self.a = []
-            self.r = []
-            self.t_start = self.t
+                    self.pi_v_network.update(self.sess,
+                        np.array(self.phi).reshape(-1,len(self.phi[0][0])),
+                        np.array(self.a).reshape(-1,len(self.a[0][0])),
+                        np.array(self.R).reshape(-1,1)
+                    )
+                    # TODO Perform asynchronous updates
+                    self.phi = [[] for i in range(len(self.envs))]
+                    self.a = [[] for i in range(len(self.envs))]
+                    self.r = [[] for i in range(len(self.envs))]
+                    self.R = [[] for i in range(len(self.envs))]
+                self.t_start[j] = self.t[j]
 
         return a_t, s_t_1, r_t, terminal, {}
 
     def new_episode(self):
-        self.env.reset()
+        for env in self.envs:
+            env.reset()
 
     def write_summary(self, episode, total_reward):
         summary = self.sess.run(self.summary, feed_dict={self.total_reward: np.array(total_reward)})

@@ -26,60 +26,47 @@ class PiVNetwork:
         self.phi_dim = phi_dim
         self.a_dim = a_dim
 
-        h1 = layer(self.x, phi_dim, 100, 'Hidden1', act=tf.nn.relu)
-        h2 = layer(self.x, phi_dim, 100, 'Hidden1', act=tf.nn.relu)
+        h1 = layer(self.x, phi_dim, 50, 'Hidden1', act=tf.nn.relu)
+        h2 = layer(self.x, phi_dim, 50, 'Hidden1', act=tf.nn.relu)
         #h2 = layer(h1, 200, 200, 'Hidden2', act=tf.nn.relu)
 
-        self.mu = layer(h1, 100, a_dim, 'mu', act=tf.identity)
-        self.sigma = layer(h2, 100, a_dim, 'sigma', act=tf.nn.softplus)
-        self.V = layer(h2, 100, 1, 'v', act=tf.identity)
+        self.mu = layer(h1, 50, a_dim, 'mu', act=tf.identity)
+        self.sigma = layer(h1, 50, a_dim, 'sigma', act=tf.nn.softplus)
+        self.V = layer(h2, 50, 1, 'v', act=tf.identity)
 
 
-        self.loss_pi = tf.log(
+        self.loss_pi = tf.reduce_sum(tf.log(
                 1/ tf.sqrt( 2.0 * 3.1415926535 * self.sigma ) *
                 tf.exp(-tf.square(self.a - self.mu) / (2 * self.sigma) )
-            ) * tf.stop_gradient(self.R - self.V)
-        self.entropy = - (tf.log(2.0 * 3.1415926535 * self.sigma) + 1.0)
+            ) * (self.R - tf.stop_gradient(self.V)))
+        self.entropy = - tf.reduce_sum(tf.log(2.0 * 3.1415926535 * self.sigma) + 1.0)
 
-        self.loss_V= tf.square(self.R - self.V)
+        self.loss_V= tf.reduce_sum(tf.square(self.R - self.V))
 
 
         # TODO need to change to RMSProp
-        # self.optimizer = tf.train.AdamOptimizer(0.000001)
-        self.optimizer = tf.train.RMSPropOptimizer(
-                        learning_rate=0.00001,
-                        decay=0.99,
-                        momentum=0.0,
-                        epsilon=0.1)
+        self.optimizer = tf.train.AdamOptimizer(0.00001)
+        # self.optimizer = tf.train.RMSPropOptimizer(
+        #                 learning_rate=0.00001,
+        #                 decay=0.99,
+        #                 momentum=0.0,
+        #                 epsilon=0.1)
 
         #self.network_params = tf.trainable_variables()
 
-        self.grad_vals_pi = self.optimizer.compute_gradients(
-            tf.reduce_sum( -self.loss_pi + 0.001 * self.entropy)
+        self.grad_vals = self.optimizer.compute_gradients(
+            -self.loss_pi - 0.001 * self.entropy + 0.5 * self.loss_V
         )
-        self.grads_pi=[]
-        self.vals_pi=[]
-        for grad,val in self.grad_vals_pi:
+        self.grads=[]
+        self.vals=[]
+        for grad,val in self.grad_vals:
             if grad is not None:
-                self.grads_pi.append(grad)
-                self.vals_pi.append(val)
+                self.grads.append(grad)
+                self.vals.append(val)
+        self.grad_vals_ = [(vals, grads) for vals, grads in zip(self.grads, self.vals)]
 
-        self.grad_vals_V = self.optimizer.compute_gradients(
-            tf.reduce_sum(0.5 * self.loss_V)
-        )
-        self.grads_V=[]
-        self.vals_V=[]
-        for grad,val in self.grad_vals_V:
-            if grad is not None:
-                self.grads_V.append(grad)
-                self.vals_V.append(val)
-
-        self.grad_vals_pi_ = [(vals, grads) for vals, grads in zip(self.grads_pi, self.vals_pi)]
-        self.grad_vals_V_ = [(vals, grads) for vals, grads in zip(self.grads_V, self.vals_V)]
-
-        self.train_pi = self.optimizer.apply_gradients(self.grad_vals_pi_)
-        self.train_V = self.optimizer.apply_gradients(self.grad_vals_V_)
-
+        #self.train = self.optimizer.apply_gradients(self.grad_vals_)
+        self.train = self.optimizer.minimize(-self.loss_pi  - 0.001 * self.entropy + 0.5 * self.loss_V)
         # TODO Make it ASyn
 
 
@@ -100,7 +87,7 @@ class PiVNetwork:
     # def apply_gradient(self, pi_gradient, v_gradient):
 
     def update(self, sess, phi, a, R):
-        sess.run([self.train_pi,self.train_V],
+        sess.run(self.train,
             feed_dict={
                 self.x: phi,
                 self.a: a,

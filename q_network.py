@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 class QNetwork:
-    def __init__(self, qname, phi_dim, a_dim, learning_rate=0.00025):
+    def __init__(self, qname, sess, phi_dim, a_dim, learning_rate=0.00025):
         def layer(input_tensor, input_dim, output_dim, name='layer', act=tf.nn.relu):
             with tf.name_scope(qname+name):
                 w = tf.Variable(tf.truncated_normal([input_dim, output_dim], stddev=0.1))
@@ -13,6 +13,7 @@ class QNetwork:
                 tf.summary.histogram('bias', b)
             return h
 
+        self.sess = sess
         self.variable_list = []
         self.x = tf.placeholder(tf.float32, [None, phi_dim])
         h1 = layer(self.x, phi_dim, 128, 'Hidden1', act=tf.nn.relu)
@@ -27,19 +28,19 @@ class QNetwork:
         #    momentum=0.95,
         #    epsilon=0.01 ).minimize(loss)
 
-    def __call__(self, sess, x):
-        return sess.run(self.y, feed_dict={self.x: x})
+    def __call__(self, x):
+        return self.sess.run(self.y, feed_dict={self.x: x})
 
-    def train(self, sess, x, t):
-        sess.run(self.train_step,
+    def train(self, x, t):
+        self.sess.run(self.train_step,
             feed_dict={self.x: x, self.t: t})
 
-    def read_variables(self, sess):
-        with sess.as_default():
+    def read_variables(self):
+        with self.sess.as_default():
             values = [valiable.eval() for valiable in self.variable_list]
         return values
 
-    def set_variables(self, sess, values):
-        with sess.as_default():
+    def set_variables(self, values):
+        with self.sess.as_default():
             for valiable, value in zip(self.variable_list, values):
                 valiable.load(value)

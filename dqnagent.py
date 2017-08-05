@@ -30,8 +30,8 @@ class DQNAgent:
         #setup tensorflow
         self.sess = tf.Session()
 
-        self.q = QNetworkClass("q_orig", self.n_input, self.n_actions, learning_rate)
-        self.q_hat = QNetworkClass("q_hat", self.n_input, self.n_actions)
+        self.q = QNetworkClass("q_orig", self.sess, self.n_input, self.n_actions, learning_rate)
+        self.q_hat = QNetworkClass("q_hat", self.sess, self.n_input, self.n_actions)
 
         self.total_reward = tf.placeholder(tf.float32)
         tf.summary.scalar("TotalReward", self.total_reward)
@@ -68,7 +68,7 @@ class DQNAgent:
                             / final_exploration_frame
 
     def act(self):
-        a_t = np.argmax(self._perform_q(self.phi_t))
+        a_t = np.argmax(self.q(self.phi_t))
 
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
         phi_t_1 = np.hstack((
@@ -85,7 +85,7 @@ class DQNAgent:
         if random.random() <= self.epsilon:
             a_t = random.randint(0, self.n_actions-1)
         else:
-            a_t = np.argmax(self._perform_q(self.phi_t))
+            a_t = np.argmax(self.q(self.phi_t))
 
         # Execute action in emulator and observe reward and state
         s_t_1, r_t, terminal, _ = self.env.step(a_t)
@@ -106,24 +106,24 @@ class DQNAgent:
             minibatch = self.replay_buffer.sample(self.minibatch_size_limit)
 
             for phi_j, a_j, r_j, phi_j_1, terminal_j in minibatch:
-                y_j = self._perform_q(phi_j)[0]
+                y_j = self.q(phi_j)[0]
                 if terminal_j:
                     y_j[a_j] = r_j
                 else:
                     # DDQN
-                    a = np.argmax(self._perform_q(phi_j_1))
-                    y_j[a_j] = r_j + self.gamma * self._perform_q_hat(phi_j_1)[0,a]
+                    a = np.argmax(self.q(phi_j_1))
+                    y_j[a_j] = r_j + self.gamma * self.q_hat(phi_j_1)[0,a]
                     # DQN
-                    #y_j[a_j] = r_j + self.gamma * np.max(self._perform_q_hat(phi_j_1))
+                    #y_j[a_j] = r_j + self.gamma * np.max(self.q_hat(phi_j_1))
                 y = np.vstack((y, y_j))
                 phi = np.vstack((phi, phi_j))
 
             # Update Q network #TODO comversion to numpy array should be done in q network class
-            self._train_q(np.array(phi, dtype=np.float32), np.array(y, dtype=np.float32))
+            self.q.train(np.array(phi, dtype=np.float32), np.array(y, dtype=np.float32))
 
             # Update target Q network every specific steps
             if self.step % self.target_update_step == 0:
-                 self._update_q_hat()
+                self.q_hat.set_variables(self.q.read_variables())
 
             # Update Exploration ratio
             if self.epsilon > self.final_exploration:
@@ -152,18 +152,6 @@ class DQNAgent:
         if model_path:
             self.saver.restore(self.sess, model_path)
             print('Restore model from ' + model_path)
-
-    def _perform_q(self, x):
-        return self.q(self.sess, x)
-
-    def _perform_q_hat(self, x):
-        return self.q_hat(self.sess, x)
-
-    def _train_q(self, x, t):
-        self.q.train(self.sess, x, t)
-
-    def _update_q_hat(self):
-        self.q_hat.set_variables(self.sess, self.q.read_variables(self.sess))
 
     def __del__(self):
         if self.log_writer:
