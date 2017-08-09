@@ -16,7 +16,7 @@ class A3CAgent:
         #self.env = env
         self.envs = []
         self.envs.append(env)
-        for i in range(15):
+        for i in range(7):
             self.envs.append(deepcopy(self.envs[0]))
             self.envs[i].seed(i)
 
