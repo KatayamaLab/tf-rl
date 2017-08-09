@@ -28,6 +28,7 @@ def main(_):
         agent = A3CAgent(env,
                 PiVNetwork,
                 history_length=1,
+                discount_factor=0.99,
                 log_dir=config.log_dir)
     else:
         agent = DQNAgent(env,

@@ -1,13 +1,13 @@
 # Environment to play
 # environment = 'LunarLanderContinuous-v2'
-# environment = 'Pendulum-v0'
-environment = 'CartPole-v1'
+environment = 'Pendulum-v0'
+# environment = 'CartPole-v1'
 # environment = 'Acrobot-v1'
 # environment = 'MountainCar-v0'
 
 # Continuous Action if true
-continuous_action = False
-# continuous_action = True
+# constinuous_action = False
+continuous_action = True
 
 # Number of Episodes
 max_episodes = 100000
