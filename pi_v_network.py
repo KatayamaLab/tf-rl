@@ -58,7 +58,7 @@ class PiVNetwork:
                         learning_rate=0.001)
         #                decay=0.99,  momentum=0.0,    epsilon=0.1)
 
-        self.train_pi = self.optimizer_pi.minimize(-self.loss_pi - 0.01 * self.entropy)
+        self.train_pi = self.optimizer_pi.minimize(-self.loss_pi - 0.001 * self.entropy)
         self.train_V = self.optimizer_V.minimize(self.loss_V)
 
         # self.total_loss = - self.loss_pi - 0.0001 * self.entropy + 0.5 * self.loss_V
@@ -105,7 +105,6 @@ class PiVNetwork:
 
     def predict_pi_and_V(self, x):
         mu, sigma, V = self.sess.run([self.mu, self.sigma, self.V], feed_dict={self.x: x})
-        mu[0] *= 2 #TODO!!!!!!
         sigma[0] += 1.0e-4
         return mu[0], sigma[0], V[0][0]
 
@@ -114,7 +113,7 @@ class PiVNetwork:
         return mu[0], sigma[0]
 
     def predict_V(self, phi):
-        return self.sess.run(self.V, feed_dict={self.x: [phi]})
+        return self.sess.run(self.V, feed_dict={self.x: [phi]})[0][0]
 
     def choose_action(self, phi):
         return self.sess.run(self.pi.sample(), feed_dict={self.x: [phi]})[0]
