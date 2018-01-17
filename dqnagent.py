@@ -21,7 +21,7 @@ class DQNAgent:
             replay_start_size=50000,
             log_dir=None):
         self.env = env
-        self.new_episode()
+        self.env.reset()
 
         self.n_actions = env.action_space.n
         self.n_states = env.observation_space.shape[0]
@@ -131,10 +131,10 @@ class DQNAgent:
 
         self.step += 1
 
-        return a_t, s_t_1, r_t, terminal, {'epsilon':self.epsilon}
+        if terminal:
+            self.env.reset()
 
-    def new_episode(self):
-        self.env.reset()
+        return a_t, s_t_1, r_t, terminal, {'epsilon':self.epsilon}
 
     def write_summary(self, episode, total_reward):
         summary = self.sess.run(self.summary, feed_dict={self.total_reward: np.array(total_reward)})

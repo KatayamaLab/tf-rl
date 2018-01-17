@@ -18,13 +18,14 @@ class A3CAgent:
         #self.env = env
         self.envs = []
         self.envs.append(env)
-        for i in range(7):
-            self.envs.append(gym.make('LunarLanderContinuous-v2'))
-            self.envs[i].reset()
-            #self.envs.append(deepcopy(self.envs[0]))
+        self.envs[0].reset()
+
+        for i in range(1,16):
+            # self.envs.append(gym.make('LunarLanderContinuous-v2'))
+            # self.envs[i].reset()
+            self.envs.append(deepcopy(self.envs[0]))
             self.envs[i].seed(i)
 
-        self.new_episode()
         self.n_actions = env.action_space.shape[0] # TODO assume 1D acction now
         self.n_states = env.observation_space.shape[0] # TODO assume 1D state now
         self.n_input = self.n_states * history_length
@@ -96,9 +97,8 @@ class A3CAgent:
 
             # Execute action in emulator and observe reward and state
             s_t_1, r_t, self.terminal[j], _ = self.envs[j].step(np.clip(a_t,self.a_min,self.a_max))
-            #s_t_1, r_t, terminal, _ = self.envs[j].step(a_t)
             r_t /= 10
-            #self.envs[j].render()
+            
             self.phi[j].append(self.phi_t[j])
             self.a[j].append(a_t)
             self.r[j].append(r_t)
@@ -111,6 +111,7 @@ class A3CAgent:
 
             if self.terminal[j] or self.t[j]-self.t_start[j] >= self.t_max:
                 if self.terminal[j]: # for terminal
+                    self.envs[j].reset()
                     R_t = 0.0
                 else: # for non-terminal s_t// Bootstrap from last state
                     R_t = self.pi_v_network.predict_V(self.phi_t[j])
@@ -131,14 +132,13 @@ class A3CAgent:
             self.r = [[] for i in range(len(self.envs))]
             self.R = [[] for i in range(len(self.envs))]
             self.period = [False for i in range(len(self.envs))]
-            if all(self.terminal):
-                return a_t, s_t_1, r_t, True, {}
 
-        return a_t, s_t_1, r_t, False, {}
+        if self.terminal[0]:
+            self.terminal[0]=False
+            return a_t, s_t_1, r_t, True, {}
+        else:
+            return a_t, s_t_1, r_t, False, {}
 
-    def new_episode(self):
-        for env in self.envs:
-            env.reset()
 
     def write_summary(self, episode, total_reward):
         summary = self.sess.run(self.summary, feed_dict={self.total_reward: np.array(total_reward)})

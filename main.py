@@ -13,6 +13,8 @@ from a3cagent import A3CAgent
 
 import config
 
+# my original environment
+import swingupcartpole
 
 def main(_):
     flags = tf.app.flags.FLAGS
@@ -34,15 +36,19 @@ def main(_):
         agent = DQNAgent(env,
                 QNetwork,
                 minibatch_size_limit=32,
-                replay_memory_size=1000000,
-                history_length=1,
+                replay_memory_size=3000000,
+                history_length=4,
+                # replay_memory_size=1000000,
+                # history_length=1,
                 target_update_step=200,
                 discount_factor=0.99,
                 learning_rate=0.0025,
                 initial_exploration=1.0,
                 final_exploration=0.01,
-                final_exploration_frame=10000,
-                replay_start_size=100,
+                final_exploration_frame=100000,
+                replay_start_size=1000,
+                #final_exploration_frame=10000,
+                #replay_start_size=100,
                 log_dir=config.log_dir)
 
     print('Observation space: ', env.observation_space,
@@ -66,6 +72,7 @@ def main(_):
                 a, s, r_t, terminal, info = agent.act()
             if config.render:
                 env.render()
+            #print(s,r_t)
             total_reward += r_t
             frames += 1
             total_frames += 1
@@ -76,8 +83,6 @@ def main(_):
         #print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward, ' Epsilon: ', info['epsilon'])
         print('Episode: ', episode, ' Frames: ', total_frames, ' R: ', total_reward)
         agent.write_summary(episode, total_reward)
-
-        agent.new_episode()
 
 if __name__ == '__main__':
     tf.app.run(main=main)

@@ -1,4 +1,5 @@
 import tensorflow as tf
+from tensorflow.contrib import rnn
 import numpy as np
 
 class PiVNetwork:
@@ -27,30 +28,23 @@ class PiVNetwork:
         self.a_dim = a_dim
 
         h1 = layer(self.x, phi_dim, 200, 'Hidden1', act=tf.nn.relu6)
-        #lstm1 = tf.contrib.rnn.BasicLSTMCell(128, forget_bias=1.0)
-        #h12 = lstm1(self.x, )
-
         h2 = layer(self.x, phi_dim, 200, 'Hidden2', act=tf.nn.relu6)
+        #lstm1 = rnn.BasicLSTMCell(128)
+        #lstm_out1, state1 = rnn.static_rnn(lstm1, h1, dtype=tf.float32)
 
         self.mu = layer(h1, 200, a_dim, 'mu', act=tf.tanh)
-        self.sigma = tf.clip_by_value(layer(h1, 200, a_dim, 'sigma', act=tf.nn.softplus), 1e-6,1e+6)
+        self.sigma = tf.clip_by_value(layer(h1, 200, a_dim, 'sigma', act=tf.nn.softplus), 1e-6, 1e+6)
         self.V = layer(h2, 200, 1, 'v', act=tf.identity)
 
-        # self.loss_pi = tf.reduce_mean(tf.log(
-        #         1/ tf.sqrt( 2.0 * 3.1415926535 * self.sigma ) *
-        #         tf.exp(-tf.square(self.a - self.mu) / (2 * self.sigma) )
-        #     ) * tf.stop_gradient(self.R - self.V))
         self.pi = tf.contrib.distributions.Normal(self.mu, self.sigma)
-        self.loss_pi = tf.reduce_mean(
+        self.loss_pi = tf.reduce_sum(
                 self.pi.log_prob(self.a)
              * (self.R - tf.stop_gradient(self.V)))
 
-        self.entropy = tf.reduce_mean(self.pi.entropy())
+        self.entropy = tf.reduce_sum(self.pi.entropy())
 
-        self.loss_V= tf.reduce_mean(tf.square(self.R - self.V) )
+        self.loss_V= tf.reduce_sum(tf.square(self.R - self.V) )
 
-
-        # TODO need to change to RMSProp
         # self.optimizer = tf.train.AdamOptimizer(0.001)
         self.optimizer_pi = tf.train.RMSPropOptimizer(
                         learning_rate=0.0001)
@@ -58,7 +52,7 @@ class PiVNetwork:
                         learning_rate=0.001)
         #                decay=0.99,  momentum=0.0,    epsilon=0.1)
 
-        self.train_pi = self.optimizer_pi.minimize(-self.loss_pi - 0.001 * self.entropy)
+        self.train_pi = self.optimizer_pi.minimize(-self.loss_pi - 0.0001 * self.entropy)
         self.train_V = self.optimizer_V.minimize(self.loss_V)
 
         # self.total_loss = - self.loss_pi - 0.0001 * self.entropy + 0.5 * self.loss_V
@@ -105,7 +99,6 @@ class PiVNetwork:
 
     def predict_pi_and_V(self, x):
         mu, sigma, V = self.sess.run([self.mu, self.sigma, self.V], feed_dict={self.x: x})
-        sigma[0] += 1.0e-4
         return mu[0], sigma[0], V[0][0]
 
     def predict_pi(self, phi):
